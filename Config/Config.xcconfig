@@ -1,0 +1,16 @@
+// Config.xcconfig — base configuration for the Cue app target.
+//
+// The Anthropic API key is injected here from Secrets.xcconfig (which is
+// gitignored and never committed). The key is then surfaced into Info.plist
+// via the ANTHROPIC_API_KEY build setting and read at runtime by AppConfig.
+//
+// One-time setup: copy Secrets.example.xcconfig to Secrets.xcconfig and paste
+// your key after the `=`. See README.md.
+
+// Optionally include local secrets. The `?` means "no error if the file is
+// absent", so the project still builds for anyone who hasn't configured a key.
+#include? "Secrets.xcconfig"
+
+// Guarantees ANTHROPIC_API_KEY exists as a build setting (empty if Secrets is
+// absent), so Info.plist substitution never leaves a dangling variable.
+ANTHROPIC_API_KEY = $(ANTHROPIC_API_KEY)

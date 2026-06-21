@@ -1,0 +1,26 @@
+# Secrets — never commit the real key
+Config/Secrets.xcconfig
+
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.moved-aside
+
+# Per-user Xcode data
+xcuserdata/
+**/xcuserdata/
+
+# Swift Package Manager (none used, but just in case)
+.build/
+.swiftpm/
+
+# Misc
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
