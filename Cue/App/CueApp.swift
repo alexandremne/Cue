@@ -7,16 +7,15 @@ struct CueApp: App {
     /// Shared SwiftData container for the task store.
     let container: ModelContainer
 
-    /// When the app is launched only to host the unit-test bundle, we skip the
-    /// real on-disk store and the live UI so the test's own in-memory container
-    /// is the single source of truth (avoids cross-container SwiftData conflicts).
+    /// When the process is launched only to host the unit-test bundle, we skip the
+    /// live UI and use an in-memory store so tests stay hermetic and don't touch
+    /// disk. (Each test creates its own container.)
     private let isRunningTests =
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     init() {
-        let useInMemory = isRunningTests
         do {
-            let configuration = ModelConfiguration(isStoredInMemoryOnly: useInMemory)
+            let configuration = ModelConfiguration(isStoredInMemoryOnly: isRunningTests)
             container = try ModelContainer(for: TaskItem.self, configurations: configuration)
         } catch {
             // A failed on-disk store shouldn't crash launch — fall back to an
@@ -33,7 +32,6 @@ struct CueApp: App {
     var body: some Scene {
         WindowGroup {
             if isRunningTests {
-                // Hosting a test run — don't spin up the live UI or its @Query.
                 Color.clear
             } else {
                 HomeView()

@@ -6,9 +6,14 @@ import XCTest
 @MainActor
 final class ToolExecutorTests: XCTestCase {
 
+    private var containers: [ModelContainer] = []
+
     private func makeContext() throws -> ModelContext {
-        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cue-test-\(UUID().uuidString).store")
+        let configuration = ModelConfiguration(url: url)
         let container = try ModelContainer(for: TaskItem.self, configurations: configuration)
+        containers.append(container) // keep alive for the duration of the test
         return container.mainContext
     }
 

@@ -54,7 +54,11 @@ enum PreviewData {
     static let emptyContainer: ModelContainer = { makeContainer() }()
 
     private static func makeContainer() -> ModelContainer {
-        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        // A unique temp on-disk store per preview keeps each preview isolated and
+        // avoids a SwiftData in-memory-store quirk where save() can trap.
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cue-preview-\(UUID().uuidString).store")
+        let configuration = ModelConfiguration(url: url)
         do {
             return try ModelContainer(for: TaskItem.self, configurations: configuration)
         } catch {
