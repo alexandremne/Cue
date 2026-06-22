@@ -25,6 +25,12 @@ final class AgentService {
 
     /// Running wire-format history sent to the model each turn.
     @ObservationIgnored private var wire: [APIMessage] = []
+    /// Remaining proposed actions from the current assistant turn (a turn can
+    /// propose several). The head is shown as `pendingAction`.
+    @ObservationIgnored private var pendingQueue: [PendingAction] = []
+    /// Accumulated `tool_result` blocks for the current turn; all are sent back
+    /// together once every proposed action has been confirmed or cancelled.
+    @ObservationIgnored private var pendingResults: [ContentBlock] = []
     @ObservationIgnored private let client: any AnthropicClient
     @ObservationIgnored private let configuration: AnthropicConfiguration
 
@@ -42,7 +48,11 @@ final class AgentService {
     /// request is already in flight.
     func submit(_ text: String) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isThinking else { return }
+        // Ignore empty input, sends while a request is in flight, and — critically —
+        // sends while an action is awaiting confirmation. Appending a new user turn
+        // before the pending tool_use is answered would corrupt the wire history
+        // (every tool_use must be followed by its tool_result).
+        guard !trimmed.isEmpty, !isThinking, pendingAction == nil else { return }
 
         messages.append(.user(trimmed))
         wire.append(APIMessage(role: "user", content: [.text(trimmed)]))
@@ -54,11 +64,11 @@ final class AgentService {
         await runTurn()
     }
 
-    /// Confirms a pending action: executes it against the store, reports the
-    /// outcome to the model, and surfaces the model's closing line.
+    /// Confirms a pending action: executes it against the store and records the
+    /// outcome. If more actions are queued from the same turn, the next is shown;
+    /// otherwise all results are sent back and the model's closing line surfaces.
     func confirm(_ action: PendingAction) async {
         guard pendingAction == action else { return }
-        pendingAction = nil
         Haptics.success()
 
         var outcome: String
@@ -76,30 +86,27 @@ final class AgentService {
             isError = true
         }
 
-        wire.append(APIMessage(role: "user",
-                               content: [.toolResult(toolUseID: action.id,
-                                                     content: outcome,
-                                                     isError: isError)]))
-        await runTurn()
+        pendingResults.append(.toolResult(toolUseID: action.id, content: outcome, isError: isError))
+        await advancePending()
     }
 
-    /// Cancels a pending action: tells the model the user declined and surfaces
-    /// the acknowledgement.
+    /// Cancels a pending action: records the decline. Advances to the next queued
+    /// action, or sends all results back once the turn's actions are resolved.
     func cancel(_ action: PendingAction) async {
         guard pendingAction == action else { return }
-        pendingAction = nil
         Haptics.light()
-        wire.append(APIMessage(role: "user",
-                               content: [.toolResult(toolUseID: action.id,
-                                                     content: "The user declined this action.",
-                                                     isError: false)]))
-        await runTurn()
+        pendingResults.append(.toolResult(toolUseID: action.id,
+                                          content: "The user declined this action.",
+                                          isError: false))
+        await advancePending()
     }
 
     /// Clears the conversation thread and any pending action. Does not touch tasks.
     func clearConversation() {
         messages.removeAll()
         wire.removeAll()
+        pendingQueue.removeAll()
+        pendingResults.removeAll()
         pendingAction = nil
     }
 
@@ -124,19 +131,39 @@ final class AgentService {
             // we never send back an unknown/empty block the API would reject).
             wire.append(APIMessage(role: "assistant", content: response.content.filter { $0.isKnown }))
 
-            if let toolUse = response.content.firstToolUse {
-                let lead = response.content.joinedText
-                if !lead.isEmpty { messages.append(.assistant(lead)) }
-                pendingAction = makePendingAction(from: toolUse, tasks: tasks)
+            // Surface any prose the model included (clarifying questions, lead-ins).
+            let lead = response.content.joinedText
+            if !lead.isEmpty { messages.append(.assistant(lead)) }
+
+            let toolUses = response.content.allToolUses
+            if toolUses.isEmpty {
+                if lead.isEmpty { messages.append(.assistant("Done.")) }
             } else {
-                let text = response.content.joinedText
-                messages.append(.assistant(text.isEmpty ? "Done." : text))
+                pendingResults = []
+                pendingQueue = toolUses.map { makePendingAction(from: $0, tasks: tasks) }
+                pendingAction = pendingQueue.first
             }
         } catch {
             let message = (error as? APIError)?.errorDescription
                 ?? "Something went wrong reaching the model. Please try again."
             appendError(message)
         }
+    }
+
+    /// Advances the per-turn action queue: shows the next proposed action, or —
+    /// when all are resolved — sends every `tool_result` back in one message and
+    /// asks the model for its closing line.
+    private func advancePending() async {
+        if !pendingQueue.isEmpty { pendingQueue.removeFirst() }
+        if let next = pendingQueue.first {
+            pendingAction = next
+            return
+        }
+        pendingAction = nil
+        guard !pendingResults.isEmpty else { return }
+        wire.append(APIMessage(role: "user", content: pendingResults))
+        pendingResults = []
+        await runTurn()
     }
 
     private func appendError(_ text: String) {

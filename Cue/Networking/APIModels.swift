@@ -172,6 +172,11 @@ extension Array where Element == ContentBlock {
         }
         return nil
     }
+    /// All `tool_use` blocks, in order. The model may propose several in one turn
+    /// (e.g. "add X and Y"); each needs its own `tool_result` in reply.
+    var allToolUses: [(id: String, name: String, input: JSONValue)] {
+        compactMap { $0.toolUse }
+    }
     /// All text blocks joined, trimmed — the assistant's prose for this turn.
     var joinedText: String {
         compactMap { $0.textValue }

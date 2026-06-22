@@ -24,3 +24,6 @@ xcuserdata/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Demo assets (screen recording + screenshots) — large binaries, kept local
+docs/demo/

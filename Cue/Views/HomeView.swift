@@ -1,5 +1,8 @@
 import SwiftData
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// The single screen: a sectioned task list, the pinned composer, the recent
 /// conversation thread, and the confirmation-card host.
@@ -116,7 +119,9 @@ struct HomeView: View {
                     onEdit: { edit(action) })
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            ComposerView(text: $composerText, isSending: agent.isThinking, onSend: submit)
+            ComposerView(text: $composerText,
+                         isSending: agent.isThinking || agent.pendingAction != nil,
+                         onSend: submit)
         }
         .padding(.horizontal, Theme.Spacing.screen)
         .padding(.bottom, Theme.Spacing.s)
@@ -150,7 +155,17 @@ struct HomeView: View {
     private func submit() {
         let text = composerText
         composerText = ""
+        // Dismiss the keyboard so the thinking indicator and confirmation card are
+        // fully visible (otherwise the card the user must confirm sits behind it).
+        dismissKeyboard()
         Task { await agent.submit(text) }
+    }
+
+    private func dismissKeyboard() {
+        #if canImport(UIKit)
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        #endif
     }
 
     private func confirm(_ action: PendingAction) {

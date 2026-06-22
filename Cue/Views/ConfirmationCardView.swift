@@ -66,6 +66,7 @@ struct ConfirmationCardView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
+            .accessibilityIdentifier("cancelAction")
             .accessibilityHint("Dismisses without changing anything")
 
             Button(action: onConfirm) {
@@ -74,6 +75,7 @@ struct ConfirmationCardView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .tint(accent)
+            .accessibilityIdentifier("confirmAction")
         }
         .padding(.top, Theme.Spacing.xs)
     }

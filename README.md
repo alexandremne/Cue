@@ -2,9 +2,19 @@
 
 **Cue is a small, polished iOS task manager driven by an in-app AI agent.** You type a plain-language request — *“schedule a call with Marko next Tuesday at 3pm”*, *“move it to Wednesday”*, *“mark the Marko call done”* — and the agent turns it into a real action inside the app via Anthropic tool calling, always pausing for a one-tap **confirmation** before it changes anything. It’s a portfolio/demo piece built to show native iOS craft, a genuine agentic loop (the model picks among four tools, it doesn’t just chat), and senior judgment: a human-in-the-loop guardrail plus graceful handling of ambiguity, errors, and offline state.
 
-> Screenshot / demo GIF placeholder — record the [demo script](#demo-script) below.
->
-> `![Cue demo](docs/cue-demo.gif)`
+## Demo
+
+📹 **Screen recording:** [`docs/demo/cue-demo.mov`](docs/demo/cue-demo.mov) — the full [demo script](#demo-script) driven end to end against the live Anthropic API.
+
+The flow below was captured automatically by the `CueUITests` UI test (it types each request, waits for the model, and confirms each action). All stills live in [`docs/demo/`](docs/demo).
+
+| Empty state | Confirmation card | Two tasks added | Completed |
+| --- | --- | --- | --- |
+| ![Empty](docs/demo/01-empty-state.png) | ![Confirm add](docs/demo/02-confirm-add.png) | ![Two tasks](docs/demo/08-tasks-added.png) | ![Completed](docs/demo/10-completed.png) |
+
+| Reschedule | Multi-action | Clarifying question | Dark mode |
+| --- | --- | --- | --- |
+| ![Reschedule](docs/demo/04-confirm-reschedule.png) | ![Multi](docs/demo/06-confirm-multi.png) | ![Clarify](docs/demo/11-clarifying-question.png) | ![Dark](docs/demo/12-dark-mode.png) |
 
 ---
 
@@ -46,6 +56,12 @@ Or from the command line:
 ```sh
 xcodebuild build -scheme Cue -destination 'platform=iOS Simulator,name=iPhone 17'
 xcodebuild test  -scheme Cue -destination 'platform=iOS Simulator,name=iPhone 17'
+```
+
+To replay the recorded acceptance demo (drives the live agent through the whole [demo script](#demo-script) and captures a screenshot per step — requires a configured key):
+
+```sh
+xcodebuild test -scheme CueUITests -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
 ---
@@ -97,8 +113,10 @@ Cue/
 │                   AssistantBubbleView, EmptyStateView
 ├── Support/        Haptics, DateParsing, Theme, PreviewSupport (DEBUG)
 └── Resources/      Assets.xcassets (AccentColor light/dark, AppIcon)
-CueTests/           ToolExecutor, DateParsing, and APIModels (Codable) tests
+CueTests/           ToolExecutor, DateParsing, APIModels (Codable), and live-API tests
+CueUITests/         End-to-end UI test that drives + captures the demo
 Config/             Config.xcconfig, Secrets.example.xcconfig, Info.plist
+docs/demo/          Recorded demo video + per-step screenshots
 ```
 
 > **Note on naming:** the persisted model is `TaskItem`, not `Task`, to avoid shadowing Swift Concurrency’s `Task`. The field set matches the spec exactly.
@@ -112,3 +130,7 @@ Unit tests cover the parts worth locking down:
 - **`ToolExecutorTests`** — each of the four tools mutates the store correctly, plus the guardrails (missing title, missing/unknown `task_id`, no-op update).
 - **`DateParsingTests`** — relative/ISO parsing, the 9:00 AM date-only default, and the ISO round-trip used in the snapshot.
 - **`APIModelsTests`** — decoding a representative `tool_use` response, encoding a `tool_result`, snake-case request keys, and graceful handling of unknown content blocks.
+- **`AgentLiveTests`** — an opt-in (`CUE_LIVE=1`) live check that sends a real request and asserts the model returns a `create_task` tool call; skipped by default.
+- **`CueUITests`** — an end-to-end UI test (separate `CueUITests` scheme) that drives the full demo script against the live agent and captures the screenshots in `docs/demo/`.
+
+> The project also has a `docs/demo/cue-demo.mov` screen recording and per-step PNGs produced by `CueUITests`.

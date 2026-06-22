@@ -26,6 +26,7 @@ struct ComposerView: View {
                 .padding(.leading, Theme.Spacing.m)
                 .padding(.vertical, Theme.Spacing.s + 2)
                 .accessibilityLabel("Message Cue")
+                .accessibilityIdentifier("composerField")
 
             Button(action: send) {
                 Image(systemName: "arrow.up")
@@ -40,6 +41,7 @@ struct ComposerView: View {
             .padding(.trailing, Theme.Spacing.xs)
             .padding(.bottom, Theme.Spacing.xs)
             .accessibilityLabel("Send")
+            .accessibilityIdentifier("composerSend")
         }
         .background(.regularMaterial,
                     in: RoundedRectangle(cornerRadius: Theme.Radius.prominent, style: .continuous))
